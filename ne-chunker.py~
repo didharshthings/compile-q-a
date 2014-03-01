@@ -12,9 +12,8 @@ import nltk
 '''
 
 from py2neo import neo4j
-graph_db = neo4j.GraphDatabaseService()
-batch = neo4j.WriteBatch(graph_db)
-		
+graph_db = neo4j.GraphDatabaseService("http://localhost:7474/db/data/")
+
 TreeBankTokenizer = TreebankWordTokenizer()
 PunktTokenizer = PunktSentenceTokenizer()
 
@@ -33,10 +32,8 @@ for sentence in PunktTokenizer.tokenize(raw):
         #print chunks
 #raw_input('Press <enter> to continue')
 
-#print entities
-for entity in entities:
-    print entity.node
-    raw_input ('stop-observe')
+print entities
+
 
 IN = re.compile(r'.*\bin\b(?!\b.+ing)')
 tokens = []
@@ -52,8 +49,8 @@ for sentence in nltk.sent_tokenize(raw):
 			tokens.append(tmp_tree)
 		else:
 			tokens.append(chunk[0])
-print tokens	 
-raw_input ('press enter to continute')
+#print tokens	 
+
 class doc():pass
 doc.headline=['']
 doc.text = tokens
@@ -69,39 +66,16 @@ doc.text = tokens
 
 pairs = nltk.sem.relextract.mk_pairs(doc.text)
 reldicts = nltk.sem.relextract.mk_reldicts(pairs) #window as key
-#creating a Knowledge Graph sort of thing
-entities = graph_db.get_or_create_index(neo4j.Node,"objects")
-
-def get_or_create_entity(name):
-		 nodes = entities.get("name", name)
-		 if len(nodes) == 1:
-		  return nodes[0]
-	     #elif nodes:
-		  #raise LookupError("Multiple people found")
-		 else:
-			return entities.create("name", name, {"name": name})
-
-relations = {}
-relId = 0
 for rel in reldicts:
- subjtext = rel['subjtext']
- objtext  = rel['objtext']
- filler   = rel['filler']
- relations[relId] = filler 
-# print rel['subjtext'] + '==>' + rel['filler'] + '==>' + rel['objtext'] + '\n'
- #subjText = entities.create_if_none("name",subjtext,{})
- #objText  = entities.create_if_none("name",objtext,{})
- #relation = neo4j.Path(subjText,filler,objText)
- subjTextNode = get_or_create_entity(subjtext)
- objTextNode  = get_or_create_entity(objtext)
- subjTextNode.get_or_create_path(relId,objTextNode)
- relId = relId+1    
- #batch.get_or_create_relationship(subjTextNode, filler , objTextNode)
- #relations = neo4j.Path((subjTextNode , filler , objTextNode))
- #path = relations.create(graph_db)
-
-print relations
-rels = batch.submit()
-
+ subjtext = str(rel['subjtext'])
+ objtext  = str(rel['objtext'])
+ filler   = str(rel['filler'])
+ print rel['subjtext'] + '==>' + rel['filler'] + '==>' + rel['objtext'] + '\n'
+ # add to  the graph
+ relation = graph_db.create(
+		 {'entity':subjtext},{'entity':objtext},
+		 (0,filler,1)
+		 )
+		 
  
-
+ 
