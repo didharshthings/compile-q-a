@@ -14,7 +14,7 @@ import nltk
 from py2neo import neo4j
 graph_db = neo4j.GraphDatabaseService()
 batch = neo4j.WriteBatch(graph_db)
-		
+
 TreeBankTokenizer = TreebankWordTokenizer()
 PunktTokenizer = PunktSentenceTokenizer()
 
@@ -26,40 +26,60 @@ raw = f.read()
 #tagged = [pos_tag(token) for token in tokens]
 #chunked = [ne_chunk(taggedToken) for taggedToken in tagged]
 
-entities = []
-for sentence in PunktTokenizer.tokenize(raw):
-        chunks = ne_chunk(pos_tag(TreeBankTokenizer.tokenize(sentence)))
-        entities.extend([chunk for chunk in chunks if hasattr(chunk,'node')])
-        #print chunks
-#raw_input('Press <enter> to continue')
-
-#print entities
-for entity in entities:
-    print entity.node
-    raw_input ('stop-observe')
 
 IN = re.compile(r'.*\bin\b(?!\b.+ing)')
 tokens = []
 
 #print "printing tokens"
-for sentence in nltk.sent_tokenize(raw):
-	for chunk in nltk.ne_chunk(nltk.pos_tag(nltk.word_tokenize(sentence))):
-		if hasattr(chunk,'node'):
-			if chunk.node != 'GPE':
-				tmp_tree = nltk.Tree(chunk.node, [(''.join(c[0] for c in chunk.leaves()))])
-			else:				
-				tmp_tree = nltk.Tree('LOCATION',[(''.join(c[0] for c in chunk.leaves()))])
-			tokens.append(tmp_tree)
-		else:
-			tokens.append(chunk[0])
-print tokens	 
-raw_input ('press enter to continute')
+#for sentence in PunktTokenizer.tokenize(raw):
+#	for chunk in nltk.ne_chunk(nltk.pos_tag(TreeBankTokenizer.tokenize(sentence))):
+#		if hasattr(chunk,'node'):
+#			if chunk.node != 'GPE':
+#				tmp_tree = nltk.Tree(chunk.node, [(''.join(c[0] for c in chunk.leaves()))])
+#			else:
+#				tmp_tree = nltk.Tree('LOCATION',[(''.join(c[0] for c in chunk.leaves()))])
+#			tokens.append(tmp_tree)
+#		else:
+#			tokens.append(chunk[0])
+
+entities = []
+for sentence in PunktTokenizer.tokenize(raw):
+        chunks = ne_chunk(pos_tag(TreeBankTokenizer.tokenize(sentence)))
+        for chunk in chunks:
+         if hasattr(chunk,'node'):
+
+            tmp_tree = nltk.Tree(chunk.node, [(''.join(c[0] for c in chunk.leaves()))])
+            tokens.append(tmp_tree)
+         else:
+            tokens.append(chunk[0])
+
+        entities.extend([chunk for chunk in chunks if hasattr(chunk,'node')])
+
+        #print chunks
+#raw_input('Press <enter> to continue')
+print entities
+#entities dict
+entities_dict = {}
+
+for entity in entities:
+    leaves = entity.leaves()
+    if len(leaves) > 1 :
+     entities_dict[entity.leaves()[0][0]+' '+entity.leaves()[1][0]] = entity.node
+    else :
+     entities_dict[entity.leaves()[0][0]] = entity.node
+
+
+print entities_dict
+
+
+#print tokens
+
 class doc():pass
 doc.headline=['']
 doc.text = tokens
 
 #for rel in nltk.sem.extract_rels('PERSON','LOCATION', doc, corpus='ieer', pattern = IN):
-# print nltk.sem.relextract.show_raw_rtuple(rel)  
+# print nltk.sem.relextract.show_raw_rtuple(rel)
 
 #doc.text=[nltk.Tree('ORGANIZATION', ['WHYY']), 'in', nltk.Tree('LOCATION',['Philadelphia']), '.', 'Ms.', nltk.Tree('PERSON', ['Gross']), ',']
 # doc.text = [Tree('ORGANIZATION', ['WHYY']), 'in', Tree('LOCATION', ['Philadelphia']), '.', 'Ms.', Tree('PERSON', ['Gross']), ',']
@@ -69,7 +89,7 @@ doc.text = tokens
 
 pairs = nltk.sem.relextract.mk_pairs(doc.text)
 reldicts = nltk.sem.relextract.mk_reldicts(pairs) #window as key
-#creating a Knowledge Graph sort of thing
+
 entities = graph_db.get_or_create_index(neo4j.Node,"objects")
 
 def get_or_create_entity(name):
@@ -83,11 +103,14 @@ def get_or_create_entity(name):
 
 relations = {}
 relId = 0
+f = open('relations.txt','w')
 for rel in reldicts:
  subjtext = rel['subjtext']
  objtext  = rel['objtext']
  filler   = rel['filler']
- relations[relId] = filler 
+ relations[relId] = filler
+ f.write( str(relId) + '=>'+ filler + '\n')
+
 # print rel['subjtext'] + '==>' + rel['filler'] + '==>' + rel['objtext'] + '\n'
  #subjText = entities.create_if_none("name",subjtext,{})
  #objText  = entities.create_if_none("name",objtext,{})
@@ -95,7 +118,7 @@ for rel in reldicts:
  subjTextNode = get_or_create_entity(subjtext)
  objTextNode  = get_or_create_entity(objtext)
  subjTextNode.get_or_create_path(relId,objTextNode)
- relId = relId+1    
+ relId = relId+1
  #batch.get_or_create_relationship(subjTextNode, filler , objTextNode)
  #relations = neo4j.Path((subjTextNode , filler , objTextNode))
  #path = relations.create(graph_db)
@@ -103,5 +126,5 @@ for rel in reldicts:
 print relations
 rels = batch.submit()
 
- 
+
 
